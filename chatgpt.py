@@ -1,37 +1,32 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Mar 13 01:54:52 2023
+from flask import Flask, request, jsonify
 
-@author: ed762
-"""
+app = Flask(__name__)
 
-from api.prompt import Prompt
+# 設定 API 路由
+@app.route('/hello', methods=['GET'])
+def hello():
+    return "Hello World!"
 
-import os
-import openai
+# 設定 API 路由，使用 POST 請求進行對話生成
+@app.route('/chat', methods=['POST'])
+def chat():
+    # 從請求中獲取使用者的訊息
+    data = request.get_json()
+    text = data["text"]
 
-openai.api_key = os.getenv("OPEN_AI_API")
+    # 使用 ChatGPT 進行對話生成
+    result = chatgpt_generate(text)
 
-class ChatGPT:
-    def __init__(self):
-        self.prompt = Prompt()
-        self.model = os.getenv("OPENAI_MODEL", default = "text-davinci-003")
-        #self.model = os.getenv("OPENAI_MODEL", default = "chatbot")
-        self.temperature = float(os.getenv("OPENAI_TEMPERATURE", default = 0))
-        self.frequency_penalty = float(os.getenv("OPENAI_FREQUENCY_PENALTY", default = 0))
-        self.presence_penalty = float(os.getenv("OPENAI_PRESENCE_PENALTY", default = 0.6))
-        self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", default = 240))
+    # 將生成的回應打包成 JSON 格式返回
+    response = {"result": result}
+    return jsonify(response)
 
-    def get_response(self):
-        response = openai.Completion.create(
-            model=self.model,
-            prompt=self.prompt.generate_prompt(),
-            temperature=self.temperature,
-            frequency_penalty=self.frequency_penalty,
-            presence_penalty=self.presence_penalty,
-            max_tokens=self.max_tokens
-        )
-        return response['choices'][0]['text'].strip()
+# 使用 ChatGPT 進行對話生成的函數
+def chatgpt_generate(text):
+    # TODO: 使用 ChatGPT API 進行對話生成
+    return "Hello, I'm ChatGPT!"
 
-    def add_msg(self, text):
-        self.prompt.add_msg(text)
+# 啟動 Flask 伺服器
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+

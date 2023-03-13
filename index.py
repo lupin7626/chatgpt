@@ -1,62 +1,50 @@
-# -*- coding: utf-8 -*-
-"""
-Spyder Editor
-
-This is a temporary script file.
-"""
-
 from flask import Flask, request, abort
+import requests
+import json
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
-from api.chatgpt import ChatGPT
-
-import os
-
-line_bot_api = LineBotApi(os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
-line_handler = WebhookHandler(os.getenv("LINE_CHANNEL_SECRET"))
-working_status = os.getenv("DEFALUT_TALKING", default = "true").lower() == "true"
 
 app = Flask(__name__)
-chatgpt = ChatGPT()
 
-# domain root
-@app.route('/')
-def home():
-    return 'Hello, World!'
+# 設定 LINE 聊天機器人的基本資訊
+line_channel_secret = "YOUR_LINE_CHANNEL_SECRET"
+line_channel_access_token = "YOUR_LINE_CHANNEL_ACCESS_TOKEN"
 
-@app.route("/webhook", methods=['POST'])
+# 建立 LineBotApi 和 WebhookHandler 實例
+line_bot_api = LineBotApi(line_channel_access_token)
+handler = WebhookHandler(line_channel_secret)
+
+# 設定 ChatGPT 的 API 資訊
+chatgpt_endpoint = "YOUR_CHATGPT_API_ENDPOINT"
+chatgpt_api_key = "YOUR_CHATGPT_API_KEY"
+
+# 設定 LINE 聊天機器人的 Webhook URL
+@app.route("/callback", methods=['POST'])
 def callback():
-    # get X-Line-Signature header value
-    signature = request.headers['X-Line-Signature']
-    # get request body as text
+    signature = request.headers.get('X-Line-Signature')
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
-    # handle webhook body
     try:
-        line_handler.handle(body, signature)
+        handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
     return 'OK'
 
-
-@line_handler.add(MessageEvent, message=TextMessage)
+# 處理 LINE 聊天機器人的回應
+@handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    global working_status
-    working_status = True
-    
-    if event.message.type != "text":
-        return
-    
+    text = event.message.text
+    user_id = event.source.user_id
 
-    if working_status:
-        chatgpt.add_msg(f"Human:{event.message.text}?\n")
-        reply_msg = chatgpt.get_response().replace("AI:", "", 1)
-        chatgpt.add_msg(f"AI:{reply_msg}\n")
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=reply_msg))
+    # 使用 ChatGPT API 進行對話生成
+    headers = {"Authorization": "Bearer " + chatgpt_api_key}
+    data = {"prompt": text, "length": 50}
+    response = requests.post(chatgpt_endpoint, headers=headers, data=json.dumps(data))
+    result = response.json()["replies"][0]
 
-
-if __name__ == "__main__":
-    app.run()
+    # 透過 LINE 聊天機器人發送對話生成的回應
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=result)
+    )
